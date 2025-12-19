@@ -1,0 +1,124 @@
+Replit Prompt (copy/paste)
+
+Build me a complete Laravel 11 web application named CarStore (PHP 8.2+) with Blade views (NOT React) and MySQL. Use clean MVC structure, migrations, seeders, policies, form requests, and service classes where needed. Add clear README setup steps.
+
+Core requirements
+
+Authentication & Roles
+
+Implement auth (register/login/logout/forgot password).
+
+Roles: admin and customer.
+
+Admin can manage everything; customer can browse and purchase.
+
+Protect routes with middleware and authorization (policies/gates).
+
+Main Website Pages
+
+Home page with featured cars + categories/brands.
+
+Cars listing page with filters: price range, brand, year, condition, transmission, fuel type.
+
+Search by keyword.
+
+Car details page with gallery, specs, availability.
+
+Contact page (store message saved to DB + optional email config).
+
+Store (E-commerce)
+
+Cart (add/remove/update quantities).
+
+Checkout with address, phone, notes.
+
+Orders: create order from cart, store order items.
+
+Order statuses: pending, paid, shipped, delivered, cancelled.
+
+Customer can view their orders and order details.
+
+Admin can update order statuses.
+
+Admin Dashboard
+Create /admin dashboard with sidebar and these modules:
+
+Cars CRUD (create/edit/delete, upload multiple images)
+
+Brands CRUD
+
+Categories CRUD
+
+Users list + ability to set role
+
+Orders list + status update
+
+Reports page: total sales, orders count, top selling cars (simple aggregates)
+
+Database Design
+Use migrations with these tables (minimum):
+
+users (role field)
+
+cars (title, description, price, year, mileage, brand_id, category_id, transmission, fuel_type, condition, stock, is_featured)
+
+car_images (car_id, path)
+
+brands
+
+categories
+
+carts (user_id)
+
+cart_items (cart_id, car_id, qty, price_snapshot)
+
+orders (user_id, total, status, address, phone, notes)
+
+order_items (order_id, car_id, qty, price_snapshot)
+
+contact_messages (name, email, message)
+
+UI
+
+Use Bootstrap 5 (or Tailwind) consistently.
+
+Make a clean responsive layout.
+
+Admin UI should be distinct (dashboard layout).
+
+Show validation errors and success alerts.
+
+File uploads
+
+Store car images using Laravel storage (public disk).
+
+Provide image upload and delete in admin.
+
+Seeders
+
+Seed an admin user (email: admin@carstore.test
+ password: Password123!)
+
+Seed sample brands, categories, and 20 cars with images placeholders (or no images if not available).
+
+Quality
+
+Use FormRequest validation.
+
+Use route model binding.
+
+Avoid duplicate query logic (use scopes or repository/service).
+
+Add pagination on cars and orders.
+
+Add basic tests for order creation (if possible).
+
+Deliverables
+
+Full working code in the Replit project.
+
+Commands to run locally and on Replit (migrate, seed).
+
+Provide .env.example and clear instructions.
+
+If anything is missing, make reasonable assumptions and implement it. Avoid stubs—finish the features end-to-end.

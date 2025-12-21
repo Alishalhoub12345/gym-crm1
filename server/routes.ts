@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, hashPassword, verifyPassword, validateStrongPassword } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import passport from "passport";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Setup Auth (Passport)
@@ -21,6 +22,79 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (req.isAuthenticated()) return next();
     res.status(401).json({ message: "Login required" });
   };
+
+  // === AUTH ROUTES ===
+  app.post(api.auth.register.path, async (req, res) => {
+    try {
+      const { username, password } = req.body;
+
+      // Validate strong password
+      const passwordValidation = validateStrongPassword(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({
+          message: "Password too weak",
+          errors: passwordValidation.errors,
+        });
+      }
+
+      // Check if user exists
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Hash password and create user
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        role: "customer",
+      });
+
+      // Log the user in
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Registration successful but login failed" });
+        }
+        res.status(201).json({
+          id: user.id,
+          username: user.username,
+          role: user.role,
+        });
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post(api.auth.login.path, passport.authenticate("local"), (req: any, res) => {
+    res.json({
+      id: req.user.id,
+      username: req.user.username,
+      role: req.user.role,
+    });
+  });
+
+  app.post(api.auth.logout.path, (req, res) => {
+    req.logOut((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logged out" });
+    });
+  });
+
+  app.get(api.auth.user.path, (req: any, res) => {
+    if (req.isAuthenticated()) {
+      res.json({
+        id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+      });
+    } else {
+      res.status(200).json(null);
+    }
+  });
 
   // === CARS ===
   app.get(api.cars.list.path, async (req, res) => {
@@ -176,22 +250,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   return httpServer;
 }
 
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
-
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
-
 async function seed() {
   // Check if admin exists
   const existingAdmin = await storage.getUserByUsername("admin@carstore.test");
   if (!existingAdmin) {
-    const hashedPassword = await hashPassword("Password123!");
+    // Strong password: Admin@123456!
+    const hashedPassword = await hashPassword("Admin@123456!");
     await storage.createUser({
       username: "admin@carstore.test",
       password: hashedPassword,

@@ -1,73 +1,120 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { type Express } from "express";
-import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
-
-declare global {
-  namespace Express {
-    interface User extends SelectUser {}
-  }
-}
+import type { Express } from "express";
+import session from "express-session";
 
 const scryptAsync = promisify(scrypt);
 
-async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-key-change-in-production";
+
+// Password hashing with proper salt
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
 }
 
-export function setupAuth(app: Express) {
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-  };
+// Password verification
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const [hashedPassword, salt] = hash.split(".");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  try {
+    return timingSafeEqual(Buffer.from(hashedPassword, "hex"), buf);
+  } catch {
+    return false;
+  }
+}
 
-  if (app.get("env") === "production") {
-    app.set("trust proxy", 1);
+// Strong password validation
+export function validateStrongPassword(password: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (password.length < 8) {
+    errors.push("Password must be at least 8 characters long");
   }
 
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
+  if (!/[A-Z]/.test(password)) {
+    errors.push("Password must contain at least one uppercase letter");
+  }
 
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
+  if (!/[a-z]/.test(password)) {
+    errors.push("Password must contain at least one lowercase letter");
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push("Password must contain at least one number");
+  }
+
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push("Password must contain at least one special character (!@#$%^&*etc)");
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// Passport Local Strategy
+passport.use(
+  new LocalStrategy(
+    {
+      usernameField: "username",
+      passwordField: "password",
+    },
+    async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user) {
-          return done(null, false, { message: "Incorrect username." });
-        } else {
-          const isValid = await comparePasswords(password, user.password);
-          if (!isValid) {
-            return done(null, false, { message: "Incorrect password." });
-          } else {
-            return done(null, user);
-          }
+          return done(null, false, { message: "Invalid username or password" });
         }
+
+        const isValid = await verifyPassword(password, user.password);
+        if (!isValid) {
+          return done(null, false, { message: "Invalid username or password" });
+        }
+
+        return done(null, user);
       } catch (err) {
         return done(err);
       }
-    }),
+    }
+  )
+);
+
+passport.serializeUser((user: any, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id: number, done) => {
+  try {
+    const user = await storage.getUser(id);
+    done(null, user);
+  } catch (err) {
+    done(err);
+  }
+});
+
+export function setupAuth(app: Express) {
+  app.use(
+    session({
+      secret: SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      },
+    })
   );
 
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
+  app.use(passport.initialize());
+  app.use(passport.session());
 
-  passport.deserializeUser(async (id: number, done) => {
-    try {
-      const user = await storage.getUser(id);
-      done(null, user);
-    } catch (err) {
-      done(err);
-    }
+  // Make user available in templates/routes
+  app.use((req, res, next) => {
+    res.locals.user = req.user;
+    next();
   });
 }

@@ -123,7 +123,7 @@ export class DatabaseStorage implements IStorage {
   async getCart(userId: number): Promise<Cart | undefined> {
     return await db.query.carts.findFirst({
       where: eq(carts.userId, userId),
-      with: { items: { with: { car: true } } }
+      with: { items: { with: { car: { with: { brand: true, category: true } } } } }
     });
   }
 

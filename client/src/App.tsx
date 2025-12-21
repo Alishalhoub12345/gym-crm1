@@ -14,7 +14,7 @@ import Cart from "@/pages/Cart";
 import Checkout from "@/pages/Checkout";
 import Orders from "@/pages/Orders";
 import Contact from "@/pages/Contact";
-// Admin pages could be added here later
+import AdminDashboard from "@/pages/AdminDashboard";
 
 function Router() {
   return (
@@ -28,6 +28,7 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/orders" component={Orders} />
       <Route path="/contact" component={Contact} />
+      <Route path="/admin" component={AdminDashboard} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

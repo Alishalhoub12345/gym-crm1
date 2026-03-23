@@ -1,322 +1,502 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { setupAuth, hashPassword, verifyPassword, validateStrongPassword } from "./auth";
 import { storage } from "./storage";
-import { api } from "@shared/routes";
+import { authenticate, requireRole, generateToken, hashPassword, verifyPassword } from "./auth";
 import { z } from "zod";
-import passport from "passport";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
-  // Setup Auth (Passport)
-  setupAuth(app);
 
-  // Middleware to check if admin
-  const isAdmin = (req: any, res: any, next: any) => {
-    if (req.isAuthenticated() && req.user.role === 'admin') {
-      return next();
-    }
-    res.status(403).json({ message: "Admin access required" });
-  };
-
-  const isAuth = (req: any, res: any, next: any) => {
-    if (req.isAuthenticated()) return next();
-    res.status(401).json({ message: "Login required" });
-  };
-
-  // === AUTH ROUTES ===
-  app.post(api.auth.register.path, async (req, res) => {
+  // === AUTH ===
+  app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
-
-      // Validate strong password
-      const passwordValidation = validateStrongPassword(password);
-      if (!passwordValidation.valid) {
-        return res.status(400).json({
-          message: "Password too weak",
-          errors: passwordValidation.errors,
-        });
-      }
-
-      // Check if user exists
-      const existing = await storage.getUserByUsername(username);
-      if (existing) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      // Hash password and create user
-      const hashedPassword = await hashPassword(password);
-      const user = await storage.createUser({
-        username,
-        password: hashedPassword,
-        role: "customer",
-      });
-
-      // Log the user in
-      req.logIn(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Registration successful but login failed" });
-        }
-        res.status(201).json({
-          id: user.id,
-          username: user.username,
-          role: user.role,
-        });
-      });
+      const { email, password } = req.body;
+      if (!email || !password) return res.status(400).json({ message: "Email and password are required" });
+      const user = await storage.getUserByEmail(email);
+      if (!user) return res.status(401).json({ message: "Invalid credentials" });
+      const valid = await verifyPassword(password, user.password);
+      if (!valid) return res.status(401).json({ message: "Invalid credentials" });
+      if (user.status !== "active") return res.status(403).json({ message: "Account is not active" });
+      const token = generateToken(user);
+      res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, branchId: user.branchId } });
     } catch (err) {
-      res.status(500).json({ message: "Registration failed" });
+      res.status(500).json({ message: "Login failed" });
     }
   });
 
-  app.post(api.auth.login.path, passport.authenticate("local"), (req: any, res) => {
-    res.json({
-      id: req.user.id,
-      username: req.user.username,
-      role: req.user.role,
-    });
+  app.get("/api/auth/me", authenticate, async (req: any, res) => {
+    const user = await storage.getUser(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ id: user.id, name: user.name, email: user.email, role: user.role, branchId: user.branchId, status: user.status });
   });
 
-  app.post(api.auth.logout.path, (req, res) => {
-    req.logOut((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Logout failed" });
-      }
-      res.json({ message: "Logged out" });
-    });
+  // === BRANCHES ===
+  app.get("/api/branches", authenticate, async (req: any, res) => {
+    const branches = await storage.getBranches();
+    res.json(branches);
   });
 
-  app.get(api.auth.user.path, (req: any, res) => {
-    if (req.isAuthenticated()) {
-      res.json({
-        id: req.user.id,
-        username: req.user.username,
-        role: req.user.role,
-      });
-    } else {
-      res.status(200).json(null);
+  app.get("/api/branches/:id", authenticate, async (req, res) => {
+    const branch = await storage.getBranch(parseInt(req.params.id));
+    if (!branch) return res.status(404).json({ message: "Branch not found" });
+    res.json(branch);
+  });
+
+  app.post("/api/branches", authenticate, requireRole("owner"), async (req, res) => {
+    try {
+      const branch = await storage.createBranch(req.body);
+      res.status(201).json(branch);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create branch" });
     }
   });
 
-  // === CARS ===
-  app.get(api.cars.list.path, async (req, res) => {
-    const filters = req.query;
-    const cars = await storage.getCars(filters);
-    res.json(cars);
+  app.put("/api/branches/:id", authenticate, requireRole("owner"), async (req, res) => {
+    try {
+      const branch = await storage.updateBranch(parseInt(req.params.id), req.body);
+      res.json(branch);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update branch" });
+    }
   });
 
-  app.get(api.cars.get.path, async (req, res) => {
-    const car = await storage.getCar(Number(req.params.id));
-    if (!car) return res.status(404).json({ message: "Car not found" });
-    res.json(car);
-  });
-
-  app.post(api.cars.create.path, isAdmin, async (req, res) => {
-    const car = await storage.createCar(req.body);
-    res.status(201).json(car);
-  });
-
-  app.put(api.cars.update.path, isAdmin, async (req, res) => {
-    const car = await storage.updateCar(Number(req.params.id), req.body);
-    res.json(car);
-  });
-
-  app.delete(api.cars.delete.path, isAdmin, async (req, res) => {
-    await storage.deleteCar(Number(req.params.id));
+  app.delete("/api/branches/:id", authenticate, requireRole("owner"), async (req, res) => {
+    await storage.deleteBranch(parseInt(req.params.id));
     res.status(204).send();
   });
 
-  // === BRANDS & CATEGORIES ===
-  app.get(api.brands.list.path, async (req, res) => {
-    const brands = await storage.getBrands();
-    res.json(brands);
+  // === USERS ===
+  app.get("/api/users", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const users = await storage.getUsers(branchId);
+    res.json(users);
   });
 
-  app.get(api.categories.list.path, async (req, res) => {
-    const categories = await storage.getCategories();
-    res.json(categories);
+  app.post("/api/users", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    try {
+      const { password, ...rest } = req.body;
+      const existing = await storage.getUserByEmail(rest.email);
+      if (existing) return res.status(400).json({ message: "Email already in use" });
+      const hashed = await hashPassword(password || "GymCRM@2024");
+      const user = await storage.createUser({ ...rest, password: hashed });
+      res.status(201).json({ id: user.id, name: user.name, email: user.email, role: user.role, branchId: user.branchId });
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create user" });
+    }
   });
 
-  // === CART ===
-  app.get(api.cart.get.path, isAuth, async (req, res) => {
-    let cart = await storage.getCart(req.user!.id);
-    if (!cart) cart = await storage.createCart(req.user!.id);
-    res.json(cart);
+  app.put("/api/users/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const data = { ...req.body };
+      if (data.password) {
+        data.password = await hashPassword(data.password);
+      }
+      const user = await storage.updateUser(parseInt(req.params.id), data);
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role, branchId: user.branchId });
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update user" });
+    }
   });
 
-  app.post(api.cart.addItem.path, isAuth, async (req, res) => {
-    let cart = await storage.getCart(req.user!.id);
-    if (!cart) cart = await storage.createCart(req.user!.id);
-    await storage.addCartItem(cart.id, req.body.carId, req.body.quantity);
-    res.json(await storage.getCart(req.user!.id));
+  app.delete("/api/users/:id", authenticate, requireRole("owner"), async (req, res) => {
+    await storage.deleteUser(parseInt(req.params.id));
+    res.status(204).send();
   });
 
-  app.patch(api.cart.updateItem.path, isAuth, async (req, res) => {
-    await storage.updateCartItem(Number(req.params.id), req.body.quantity);
-    res.json(await storage.getCart(req.user!.id));
+  // === MEMBERS ===
+  app.get("/api/members", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getMembers(branchId);
+    res.json(result);
   });
 
-  app.delete(api.cart.removeItem.path, isAuth, async (req, res) => {
-    await storage.removeCartItem(Number(req.params.id));
-    res.json(await storage.getCart(req.user!.id));
+  app.get("/api/members/:id", authenticate, async (req, res) => {
+    const member = await storage.getMember(parseInt(req.params.id));
+    if (!member) return res.status(404).json({ message: "Member not found" });
+    res.json(member);
   });
 
-  app.post(api.cart.clear.path, isAuth, async (req, res) => {
-    const cart = await storage.getCart(req.user!.id);
-    if (cart) await storage.clearCart(cart.id);
-    res.json({ message: "Cart cleared" });
+  app.post("/api/members", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    try {
+      const { email, name, phone, password, ...memberData } = req.body;
+      const existing = await storage.getUserByEmail(email);
+      if (existing) return res.status(400).json({ message: "Email already in use" });
+      const hashed = await hashPassword(password || "Member@2024");
+      const user = await storage.createUser({ name, email, phone, password: hashed, role: "member", branchId: memberData.branchId, status: "active" });
+      const member = await storage.createMember({ ...memberData, userId: user.id });
+      res.status(201).json({ ...member, userName: name, userEmail: email });
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create member" });
+    }
+  });
+
+  app.put("/api/members/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const { email, name, phone, ...memberData } = req.body;
+      const member = await storage.updateMember(parseInt(req.params.id), memberData);
+      res.json(member);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update member" });
+    }
+  });
+
+  app.delete("/api/members/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    await storage.deleteMember(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  // === COACHES ===
+  app.get("/api/coaches", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getCoaches(branchId);
+    res.json(result);
+  });
+
+  app.get("/api/coaches/:id", authenticate, async (req, res) => {
+    const coach = await storage.getCoach(parseInt(req.params.id));
+    if (!coach) return res.status(404).json({ message: "Coach not found" });
+    res.json(coach);
+  });
+
+  app.post("/api/coaches", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    try {
+      const { email, name, phone, password, ...coachData } = req.body;
+      const existing = await storage.getUserByEmail(email);
+      if (existing) return res.status(400).json({ message: "Email already in use" });
+      const hashed = await hashPassword(password || "Coach@2024");
+      const user = await storage.createUser({ name, email, phone, password: hashed, role: "coach", branchId: coachData.branchId, status: "active" });
+      const coach = await storage.createCoach({ ...coachData, userId: user.id });
+      res.status(201).json({ ...coach, userName: name, userEmail: email });
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create coach" });
+    }
+  });
+
+  app.put("/api/coaches/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const coach = await storage.updateCoach(parseInt(req.params.id), req.body);
+      res.json(coach);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update coach" });
+    }
+  });
+
+  app.delete("/api/coaches/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    await storage.deleteCoach(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  // === PACKAGES ===
+  app.get("/api/packages", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getPackages(branchId);
+    res.json(result);
+  });
+
+  app.post("/api/packages", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const pkg = await storage.createPackage(req.body);
+      res.status(201).json(pkg);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create package" });
+    }
+  });
+
+  app.put("/api/packages/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const pkg = await storage.updatePackage(parseInt(req.params.id), req.body);
+      res.json(pkg);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update package" });
+    }
+  });
+
+  app.delete("/api/packages/:id", authenticate, requireRole("owner"), async (req, res) => {
+    await storage.deletePackage(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  // === SUBSCRIPTIONS ===
+  app.get("/api/subscriptions", authenticate, async (req: any, res) => {
+    const memberId = req.query.memberId ? parseInt(req.query.memberId as string) : undefined;
+    const result = await storage.getSubscriptions(memberId);
+    res.json(result);
+  });
+
+  app.post("/api/subscriptions", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const sub = await storage.createSubscription(req.body);
+      res.status(201).json(sub);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create subscription" });
+    }
+  });
+
+  app.put("/api/subscriptions/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const sub = await storage.updateSubscription(parseInt(req.params.id), req.body);
+      res.json(sub);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update subscription" });
+    }
+  });
+
+  // === CLASSES ===
+  app.get("/api/classes", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getClasses(branchId);
+    res.json(result);
+  });
+
+  app.get("/api/classes/:id", authenticate, async (req, res) => {
+    const cls = await storage.getClass(parseInt(req.params.id));
+    if (!cls) return res.status(404).json({ message: "Class not found" });
+    res.json(cls);
+  });
+
+  app.post("/api/classes", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const cls = await storage.createClass(req.body);
+      res.status(201).json(cls);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create class" });
+    }
+  });
+
+  app.put("/api/classes/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const cls = await storage.updateClass(parseInt(req.params.id), req.body);
+      res.json(cls);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update class" });
+    }
+  });
+
+  app.delete("/api/classes/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    await storage.deleteClass(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  // === CLASS BOOKINGS ===
+  app.get("/api/bookings", authenticate, async (req: any, res) => {
+    const classId = req.query.classId ? parseInt(req.query.classId as string) : undefined;
+    const memberId = req.query.memberId ? parseInt(req.query.memberId as string) : undefined;
+    const result = await storage.getClassBookings(classId, memberId);
+    res.json(result);
+  });
+
+  app.post("/api/bookings", authenticate, async (req: any, res) => {
+    try {
+      const booking = await storage.createClassBooking(req.body);
+      res.status(201).json(booking);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create booking" });
+    }
+  });
+
+  app.put("/api/bookings/:id", authenticate, async (req, res) => {
+    try {
+      const booking = await storage.updateClassBooking(parseInt(req.params.id), req.body);
+      res.json(booking);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update booking" });
+    }
+  });
+
+  // === PAYMENTS ===
+  app.get("/api/payments", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const memberId = req.query.memberId ? parseInt(req.query.memberId as string) : undefined;
+    const result = await storage.getPayments(branchId, memberId);
+    res.json(result);
+  });
+
+  app.post("/api/payments", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const payment = await storage.createPayment(req.body);
+      res.status(201).json(payment);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create payment" });
+    }
+  });
+
+  // === ATTENDANCE ===
+  app.get("/api/attendance", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const memberId = req.query.memberId ? parseInt(req.query.memberId as string) : undefined;
+    const result = await storage.getAttendance(branchId, memberId);
+    res.json(result);
+  });
+
+  app.post("/api/attendance", authenticate, requireRole("owner", "admin", "coach"), async (req, res) => {
+    try {
+      const rec = await storage.createAttendance(req.body);
+      res.status(201).json(rec);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to record attendance" });
+    }
+  });
+
+  // === PRODUCTS ===
+  app.get("/api/products", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getProducts(branchId);
+    res.json(result);
+  });
+
+  app.post("/api/products", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const product = await storage.createProduct(req.body);
+      res.status(201).json(product);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create product" });
+    }
+  });
+
+  app.put("/api/products/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const product = await storage.updateProduct(parseInt(req.params.id), req.body);
+      res.json(product);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    await storage.deleteProduct(parseInt(req.params.id));
+    res.status(204).send();
   });
 
   // === ORDERS ===
-  app.post(api.orders.create.path, isAuth, async (req, res) => {
-    const cart = await storage.getCart(req.user!.id);
-    if (!cart || !cart.items || cart.items.length === 0) {
-      return res.status(400).json({ message: "Cart is empty" });
-    }
-
-    // Calculate total from current car prices
-    let total = 0;
-    const orderItemsData = [];
-    
-    for (const item of cart.items) {
-      const car = item.car; // Joined in getCart
-      if (!car) continue;
-      
-      const price = Number(car.price);
-      total += price * item.quantity;
-      
-      orderItemsData.push({
-        carId: item.carId,
-        quantity: item.quantity,
-        priceSnapshot: price.toString(),
-      });
-    }
-
-    const orderData = {
-      userId: req.user!.id,
-      total: total.toString(),
-      address: req.body.address,
-      phone: req.body.phone,
-      notes: req.body.notes,
-      status: "pending",
-    };
-
-    const order = await storage.createOrder(orderData, orderItemsData);
-    await storage.clearCart(cart.id); // Clear cart after order
-    
-    res.status(201).json(order);
+  app.get("/api/orders", authenticate, async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getOrders(branchId);
+    res.json(result);
   });
 
-  app.get(api.orders.list.path, isAuth, async (req, res) => {
-    if (req.user!.role === 'admin') {
-      const orders = await storage.getOrders();
-      res.json(orders);
-    } else {
-      const orders = await storage.getOrders(req.user!.id);
-      res.json(orders);
+  app.post("/api/orders", authenticate, async (req: any, res) => {
+    try {
+      const { items, ...orderData } = req.body;
+      const order = await storage.createOrder(orderData, items || []);
+      res.status(201).json(order);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create order" });
     }
   });
 
-  app.patch(api.orders.updateStatus.path, isAdmin, async (req, res) => {
-    const order = await storage.updateOrderStatus(Number(req.params.id), req.body.status);
-    res.json(order);
+  // === LEADS ===
+  app.get("/api/leads", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const result = await storage.getLeads(branchId);
+    res.json(result);
   });
 
-  // === MESSAGES ===
-  app.post(api.contact.submit.path, async (req, res) => {
-    const msg = await storage.createMessage(req.body);
-    res.status(201).json(msg);
+  app.post("/api/leads", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    try {
+      const lead = await storage.createLead(req.body);
+      res.status(201).json(lead);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create lead" });
+    }
   });
 
-  app.get(api.contact.list.path, isAdmin, async (req, res) => {
-    const msgs = await storage.getMessages();
-    res.json(msgs);
+  app.put("/api/leads/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const lead = await storage.updateLead(parseInt(req.params.id), req.body);
+      res.json(lead);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update lead" });
+    }
+  });
+
+  app.delete("/api/leads/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    await storage.deleteLead(parseInt(req.params.id));
+    res.status(204).send();
+  });
+
+  app.get("/api/leads/:id/tasks", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    const tasks = await storage.getLeadTasks(parseInt(req.params.id));
+    res.json(tasks);
+  });
+
+  app.post("/api/leads/:id/tasks", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const task = await storage.createLeadTask({ ...req.body, leadId: parseInt(req.params.id) });
+      res.status(201).json(task);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.put("/api/lead-tasks/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    try {
+      const task = await storage.updateLeadTask(parseInt(req.params.id), req.body);
+      res.json(task);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update task" });
+    }
+  });
+
+  // === DIET PLANS ===
+  app.get("/api/diet-plans", authenticate, async (req: any, res) => {
+    const memberId = req.query.memberId ? parseInt(req.query.memberId as string) : undefined;
+    const result = await storage.getDietPlans(memberId);
+    res.json(result);
+  });
+
+  app.post("/api/diet-plans", authenticate, requireRole("owner", "admin", "dietitian"), async (req: any, res) => {
+    try {
+      const plan = await storage.createDietPlan({ ...req.body, dietitianId: req.user.id });
+      res.status(201).json(plan);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to create diet plan" });
+    }
+  });
+
+  app.put("/api/diet-plans/:id", authenticate, requireRole("owner", "admin", "dietitian"), async (req, res) => {
+    try {
+      const plan = await storage.updateDietPlan(parseInt(req.params.id), req.body);
+      res.json(plan);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update diet plan" });
+    }
+  });
+
+  // === CONTACT MESSAGES ===
+  app.get("/api/contact-messages", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    const messages = await storage.getContactMessages();
+    res.json(messages);
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const msg = await storage.createContactMessage(req.body);
+      res.status(201).json(msg);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to submit message" });
+    }
+  });
+
+  app.put("/api/contact-messages/:id", authenticate, requireRole("owner", "admin"), async (req, res) => {
+    const msg = await storage.updateContactMessage(parseInt(req.params.id), req.body.status);
+    res.json(msg);
+  });
+
+  // === NEWSLETTER ===
+  app.post("/api/newsletter", async (req, res) => {
+    try {
+      await storage.subscribeNewsletter(req.body.email);
+      res.status(201).json({ message: "Subscribed successfully" });
+    } catch (err) {
+      res.status(400).json({ message: "Failed to subscribe" });
+    }
   });
 
   // === DASHBOARD ===
-  app.get(api.dashboard.stats.path, isAdmin, async (req, res) => {
-    const stats = await storage.getDashboardStats();
+  app.get("/api/dashboard/stats", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
+    const branchId = req.user.role === "owner" ? undefined : req.user.branchId;
+    const stats = await storage.getDashboardStats(branchId);
     res.json(stats);
   });
 
-  // SEED DATA ROUTE (For development)
-  app.post("/api/seed", async (req, res) => {
-    // Basic check to prevent public re-seeding if needed, or just let it be for dev
-    await seed();
-    res.json({ message: "Database seeded" });
-  });
-
-  // Auto-seed on startup
-  seed().catch(console.error);
-
   return httpServer;
-}
-
-async function seed() {
-  // Check if admin exists
-  const existingAdmin = await storage.getUserByUsername("admin@carstore.test");
-  if (!existingAdmin) {
-    // Strong password: Admin@123456!
-    const hashedPassword = await hashPassword("Admin@123456!");
-    await storage.createUser({
-      username: "admin@carstore.test",
-      password: hashedPassword,
-      role: "admin"
-    });
-  }
-
-  // Brands
-  const brandsList = ["Toyota", "Honda", "BMW", "Mercedes", "Ford", "Tesla"];
-  const brandsMap: Record<string, number> = {};
-  for (const b of brandsList) {
-    const existing = (await storage.getBrands()).find((br: any) => br.name === b);
-    if (!existing) {
-      const newB = await storage.createBrand(b);
-      brandsMap[b] = newB.id;
-    } else {
-      brandsMap[b] = existing.id;
-    }
-  }
-
-  // Categories
-  const catsList = ["SUV", "Sedan", "Coupe", "Truck", "Electric"];
-  const catsMap: Record<string, number> = {};
-  for (const c of catsList) {
-    const existing = (await storage.getCategories()).find((cat: any) => cat.name === c);
-    if (!existing) {
-      const newC = await storage.createCategory(c);
-      catsMap[c] = newC.id;
-    } else {
-      catsMap[c] = existing.id;
-    }
-  }
-
-  // Cars (Seed 20 cars)
-  const carsCount = (await storage.getCars()).length;
-  if (carsCount === 0) {
-    const sampleCars = [
-      { title: "Toyota Camry 2023", brand: "Toyota", cat: "Sedan", price: "25000", year: 2023, mileage: 5000 },
-      { title: "Honda CR-V", brand: "Honda", cat: "SUV", price: "28000", year: 2022, mileage: 12000 },
-      { title: "BMW 3 Series", brand: "BMW", cat: "Sedan", price: "45000", year: 2023, mileage: 2000 },
-      { title: "Tesla Model 3", brand: "Tesla", cat: "Electric", price: "35000", year: 2021, mileage: 25000 },
-      { title: "Ford F-150", brand: "Ford", cat: "Truck", price: "40000", year: 2020, mileage: 45000 },
-    ];
-
-    for (let i = 0; i < 20; i++) {
-      const sample = sampleCars[i % sampleCars.length];
-      await storage.createCar({
-        title: `${sample.title} #${i+1}`,
-        description: "A great car with amazing features. Reliable and well maintained.",
-        price: (Number(sample.price) + i * 100).toString(),
-        year: sample.year,
-        mileage: sample.mileage + i * 1000,
-        brandId: brandsMap[sample.brand],
-        categoryId: catsMap[sample.cat],
-        transmission: i % 3 === 0 ? "manual" : "automatic",
-        fuelType: sample.brand === "Tesla" ? "electric" : "petrol",
-        condition: i % 5 === 0 ? "new" : "used",
-        stock: 1,
-        isFeatured: i < 5,
-        images: ["https://images.unsplash.com/photo-1541443131876-44b03de101c5?w=800", "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=800"],
-      });
-    }
-  }
 }

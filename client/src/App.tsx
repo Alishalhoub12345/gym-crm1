@@ -1,36 +1,56 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 
-import Home from "@/pages/Home";
-import CarsList from "@/pages/CarsList";
-import CarDetail from "@/pages/CarDetail";
 import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import Cart from "@/pages/Cart";
-import Checkout from "@/pages/Checkout";
-import Orders from "@/pages/Orders";
-import Contact from "@/pages/Contact";
-import AdminDashboard from "@/pages/AdminDashboard";
+import Dashboard from "@/pages/Dashboard";
+import Branches from "@/pages/Branches";
+import Members from "@/pages/Members";
+import Coaches from "@/pages/Coaches";
+import Classes from "@/pages/Classes";
+import Packages from "@/pages/Packages";
+import Payments from "@/pages/Payments";
+import Attendance from "@/pages/Attendance";
+import Leads from "@/pages/Leads";
+import Products from "@/pages/Products";
+import Users from "@/pages/Users";
+import DietPlans from "@/pages/DietPlans";
+import Messages from "@/pages/Messages";
+
+function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  if (!user) return <Redirect to="/login" />;
+  if (roles && !roles.includes(user.role)) return <Redirect to="/dashboard" />;
+  return <Component />;
+}
 
 function Router() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/cars" component={CarsList} />
-      <Route path="/cars/:id" component={CarDetail} />
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route path="/cart" component={Cart} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/orders" component={Orders} />
-      <Route path="/contact" component={Contact} />
-      <Route path="/admin" component={AdminDashboard} />
-      
-      {/* Fallback to 404 */}
+      <Route path="/">{user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}</Route>
+      <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
+      <Route path="/branches"><ProtectedRoute component={Branches} roles={["owner"]} /></Route>
+      <Route path="/members"><ProtectedRoute component={Members} roles={["owner", "admin"]} /></Route>
+      <Route path="/coaches"><ProtectedRoute component={Coaches} roles={["owner", "admin"]} /></Route>
+      <Route path="/classes"><ProtectedRoute component={Classes} /></Route>
+      <Route path="/packages"><ProtectedRoute component={Packages} roles={["owner", "admin"]} /></Route>
+      <Route path="/payments"><ProtectedRoute component={Payments} roles={["owner", "admin"]} /></Route>
+      <Route path="/attendance"><ProtectedRoute component={Attendance} /></Route>
+      <Route path="/leads"><ProtectedRoute component={Leads} roles={["owner", "admin"]} /></Route>
+      <Route path="/products"><ProtectedRoute component={Products} roles={["owner", "admin"]} /></Route>
+      <Route path="/users"><ProtectedRoute component={Users} roles={["owner"]} /></Route>
+      <Route path="/diet-plans"><ProtectedRoute component={DietPlans} /></Route>
+      <Route path="/messages"><ProtectedRoute component={Messages} roles={["owner", "admin"]} /></Route>
       <Route component={NotFound} />
     </Switch>
   );

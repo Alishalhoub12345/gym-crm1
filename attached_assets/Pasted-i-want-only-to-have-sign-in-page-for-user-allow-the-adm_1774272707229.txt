@@ -1,0 +1,94 @@
+i want only to have sign in page for user allow the admin to create new branch and new classes and new users and new trainers The system must include:
+
+User Roles:
+Owner (full access to all branches)
+Branch Admin (access only to their branch)
+Coach (manage assigned classes and attendance)
+Member (book classes, view profile, payments)
+Core Features:
+A. Member Management
+
+Create, edit, delete members
+Full member profile including:
+personal info
+membership details
+attendance
+payments
+fitness info
+B. Branch System
+
+Multiple branches
+Each user belongs to a branch
+Owner can see all branches
+C. Classes System
+
+Create classes
+Assign coaches
+Set schedule and capacity
+Members can book classes
+D. Booking Logic
+
+If member has active package → allow booking
+If not → require extra payment
+E. Packages & Subscriptions
+
+Create packages (monthly, yearly, class-based)
+Assign to members
+Track validity and remaining sessions
+F. Payments
+
+Record payments (cash/card)
+Link payments to:
+subscriptions
+class bookings
+Payment history per member
+G. Attendance
+
+Track check-in
+Track class attendance
+H. Dietitian Module (optional role)
+
+Dietitian can assign diet plans
+Track nutrition and notes
+I. CRM Leads
+
+Track leads
+Follow-up tasks
+J. E-commerce
+
+Products (supplements)
+Orders
+Cart
+K. Website Features
+
+Home page
+Classes page
+Packages page
+Contact form
+Newsletter subscription
+UI Requirements:
+Modern dashboard design
+Sidebar navigation
+Cards and tables
+Clean Tailwind UI
+Responsive design
+Backend Requirements:
+REST API structure
+Controllers, routes, models
+JWT authentication
+Role-based access control
+Database:
+Provide full MySQL schema
+Include all tables and relationships
+Output Format:
+Provide full project structure:
+/frontend
+/backend
+/database
+
+Include:
+
+all code files
+setup instructions
+how to run the project
+Make the code clean, production-ready, and well-structured. builed as you look it fit and for user only sign-in

@@ -4,10 +4,10 @@ import { storage } from "./storage";
 import { authenticate, requireRole, generateToken, hashPassword, verifyPassword, hasStrongPasswordRules, getPasswordRuleMessage } from "./auth";
 import { z } from "zod";
 
-function addDays(dateString: string, days: number) {
-  const date = new Date(dateString);
+function addDays(dateInput: string | Date, days: number) {
+  const date = new Date(dateInput);
   date.setDate(date.getDate() + days);
-  return date.toISOString().split("T")[0];
+  return date;
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
@@ -140,7 +140,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const hashed = await hashPassword(rawPassword);
       const user = await storage.createUser({ name, email, phone, password: hashed, role: "member", branchId: memberData.branchId, status: "active" });
       const member = await storage.createMember({ ...memberData, userId: user.id, primaryPackageId: pkg.id });
-      const startDate = memberData.joinDate || new Date().toISOString().split("T")[0];
+      const startDate = memberData.joinDate ? new Date(memberData.joinDate) : new Date();
       await storage.createSubscription({
         memberId: member.id,
         packageId: pkg.id,

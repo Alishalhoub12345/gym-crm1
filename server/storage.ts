@@ -15,6 +15,31 @@ import {
 import { eq, and, desc, sql, gte, lte, isNull, or } from "drizzle-orm";
 
 export class DatabaseStorage {
+  private async insertAndFetch(table: any, values: any): Promise<any> {
+    const [result] = await db.insert(table).values(values).$returningId();
+    if (!result?.id) {
+      throw new Error("Insert failed");
+    }
+
+    const [created] = await db.select().from(table).where(eq(table.id, result.id));
+    if (!created) {
+      throw new Error(`Inserted record ${result.id} was not found`);
+    }
+
+    return created;
+  }
+
+  private async updateAndFetch(table: any, id: number, data: any): Promise<any> {
+    await db.update(table).set(data).where(eq(table.id, id));
+
+    const [updated] = await db.select().from(table).where(eq(table.id, id));
+    if (!updated) {
+      throw new Error(`Updated record ${id} was not found`);
+    }
+
+    return updated;
+  }
+
   // === USERS ===
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -34,13 +59,11 @@ export class DatabaseStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [created] = await db.insert(users).values(user).returning();
-    return created;
+    return this.insertAndFetch(users, user);
   }
 
   async updateUser(id: number, data: Partial<InsertUser>): Promise<User> {
-    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(users, id, data);
   }
 
   async deleteUser(id: number): Promise<void> {
@@ -58,13 +81,11 @@ export class DatabaseStorage {
   }
 
   async createBranch(branch: InsertBranch): Promise<Branch> {
-    const [created] = await db.insert(branches).values(branch).returning();
-    return created;
+    return this.insertAndFetch(branches, branch);
   }
 
   async updateBranch(id: number, data: Partial<InsertBranch>): Promise<Branch> {
-    const [updated] = await db.update(branches).set(data).where(eq(branches.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(branches, id, data);
   }
 
   async deleteBranch(id: number): Promise<void> {
@@ -147,13 +168,11 @@ export class DatabaseStorage {
   }
 
   async createMember(member: InsertMember): Promise<Member> {
-    const [created] = await db.insert(members).values(member).returning();
-    return created;
+    return this.insertAndFetch(members, member);
   }
 
   async updateMember(id: number, data: Partial<InsertMember>): Promise<Member> {
-    const [updated] = await db.update(members).set(data).where(eq(members.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(members, id, data);
   }
 
   async deleteMember(id: number): Promise<void> {
@@ -211,13 +230,11 @@ export class DatabaseStorage {
   }
 
   async createCoach(coach: InsertCoach): Promise<Coach> {
-    const [created] = await db.insert(coaches).values(coach).returning();
-    return created;
+    return this.insertAndFetch(coaches, coach);
   }
 
   async updateCoach(id: number, data: Partial<InsertCoach>): Promise<Coach> {
-    const [updated] = await db.update(coaches).set(data).where(eq(coaches.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(coaches, id, data);
   }
 
   async deleteCoach(id: number): Promise<void> {
@@ -240,13 +257,11 @@ export class DatabaseStorage {
   }
 
   async createPackage(pkg: InsertPackage): Promise<Package> {
-    const [created] = await db.insert(packages).values(pkg).returning();
-    return created;
+    return this.insertAndFetch(packages, pkg);
   }
 
   async updatePackage(id: number, data: Partial<InsertPackage>): Promise<Package> {
-    const [updated] = await db.update(packages).set(data).where(eq(packages.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(packages, id, data);
   }
 
   async deletePackage(id: number): Promise<void> {
@@ -301,13 +316,11 @@ export class DatabaseStorage {
   }
 
   async createSubscription(sub: InsertSubscription): Promise<Subscription> {
-    const [created] = await db.insert(subscriptions).values(sub).returning();
-    return created;
+    return this.insertAndFetch(subscriptions, sub);
   }
 
   async updateSubscription(id: number, data: Partial<InsertSubscription>): Promise<Subscription> {
-    const [updated] = await db.update(subscriptions).set(data).where(eq(subscriptions.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(subscriptions, id, data);
   }
 
   // === CLASSES ===
@@ -367,13 +380,11 @@ export class DatabaseStorage {
   }
 
   async createClass(cls: InsertClass): Promise<Class> {
-    const [created] = await db.insert(classes).values(cls).returning();
-    return created;
+    return this.insertAndFetch(classes, cls);
   }
 
   async updateClass(id: number, data: Partial<InsertClass>): Promise<Class> {
-    const [updated] = await db.update(classes).set(data).where(eq(classes.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(classes, id, data);
   }
 
   async deleteClass(id: number): Promise<void> {
@@ -407,13 +418,11 @@ export class DatabaseStorage {
   }
 
   async createClassBooking(booking: InsertClassBooking): Promise<ClassBooking> {
-    const [created] = await db.insert(classBookings).values(booking).returning();
-    return created;
+    return this.insertAndFetch(classBookings, booking);
   }
 
   async updateClassBooking(id: number, data: Partial<InsertClassBooking>): Promise<ClassBooking> {
-    const [updated] = await db.update(classBookings).set(data).where(eq(classBookings.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(classBookings, id, data);
   }
 
   // === PAYMENTS ===
@@ -449,8 +458,7 @@ export class DatabaseStorage {
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const [created] = await db.insert(payments).values(payment).returning();
-    return created;
+    return this.insertAndFetch(payments, payment);
   }
 
   // === ATTENDANCE ===
@@ -481,8 +489,7 @@ export class DatabaseStorage {
   }
 
   async createAttendance(rec: InsertAttendance): Promise<Attendance> {
-    const [created] = await db.insert(attendance).values(rec).returning();
-    return created;
+    return this.insertAndFetch(attendance, rec);
   }
 
   // === PRODUCTS ===
@@ -501,13 +508,11 @@ export class DatabaseStorage {
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
-    const [created] = await db.insert(products).values(product).returning();
-    return created;
+    return this.insertAndFetch(products, product);
   }
 
   async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
-    const [updated] = await db.update(products).set(data).where(eq(products.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(products, id, data);
   }
 
   async deleteProduct(id: number): Promise<void> {
@@ -537,7 +542,7 @@ export class DatabaseStorage {
   }
 
   async createOrder(order: InsertOrder, items: any[]): Promise<Order> {
-    const [created] = await db.insert(orders).values(order).returning();
+    const created = await this.insertAndFetch(orders, order);
     if (items.length > 0) {
       await db.insert(orderItems).values(items.map(item => ({ ...item, orderId: created.id })));
     }
@@ -578,13 +583,11 @@ export class DatabaseStorage {
   }
 
   async createLead(lead: InsertLead): Promise<Lead> {
-    const [created] = await db.insert(leads).values(lead).returning();
-    return created;
+    return this.insertAndFetch(leads, lead);
   }
 
   async updateLead(id: number, data: Partial<InsertLead>): Promise<Lead> {
-    const [updated] = await db.update(leads).set(data).where(eq(leads.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(leads, id, data);
   }
 
   async deleteLead(id: number): Promise<void> {
@@ -596,13 +599,11 @@ export class DatabaseStorage {
   }
 
   async createLeadTask(task: InsertLeadTask): Promise<LeadTask> {
-    const [created] = await db.insert(leadTasks).values(task).returning();
-    return created;
+    return this.insertAndFetch(leadTasks, task);
   }
 
   async updateLeadTask(id: number, data: Partial<InsertLeadTask>): Promise<LeadTask> {
-    const [updated] = await db.update(leadTasks).set(data).where(eq(leadTasks.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(leadTasks, id, data);
   }
 
   // === DIET PLANS ===
@@ -614,13 +615,11 @@ export class DatabaseStorage {
   }
 
   async createDietPlan(plan: InsertDietPlan): Promise<DietPlan> {
-    const [created] = await db.insert(dietPlans).values(plan).returning();
-    return created;
+    return this.insertAndFetch(dietPlans, plan);
   }
 
   async updateDietPlan(id: number, data: Partial<InsertDietPlan>): Promise<DietPlan> {
-    const [updated] = await db.update(dietPlans).set(data).where(eq(dietPlans.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(dietPlans, id, data);
   }
 
   // === CONTACT MESSAGES ===
@@ -629,18 +628,18 @@ export class DatabaseStorage {
   }
 
   async createContactMessage(msg: InsertContactMessage): Promise<ContactMessage> {
-    const [created] = await db.insert(contactMessages).values(msg).returning();
-    return created;
+    return this.insertAndFetch(contactMessages, msg);
   }
 
   async updateContactMessage(id: number, status: string): Promise<ContactMessage> {
-    const [updated] = await db.update(contactMessages).set({ status: status as any }).where(eq(contactMessages.id, id)).returning();
-    return updated;
+    return this.updateAndFetch(contactMessages, id, { status: status as any });
   }
 
   // === NEWSLETTER ===
   async subscribeNewsletter(email: string): Promise<void> {
-    await db.insert(newsletterSubscribers).values({ email }).onConflictDoNothing();
+    await db.insert(newsletterSubscribers).values({ email }).onDuplicateKeyUpdate({
+      set: { email },
+    });
   }
 
   // === DASHBOARD STATS ===
@@ -652,7 +651,7 @@ export class DatabaseStorage {
     const [memberCount] = await db.select({ count: sql<number>`count(*)` }).from(members).where(memberFilter);
     const [coachCount] = await db.select({ count: sql<number>`count(*)` }).from(coaches).where(branchId ? eq(coaches.branchId, branchId) : undefined);
     const [classCount] = await db.select({ count: sql<number>`count(*)` }).from(classes).where(classFilter);
-    const [paymentSum] = await db.select({ total: sql<number>`coalesce(sum(amount::numeric), 0)` }).from(payments).where(paymentFilter);
+    const [paymentSum] = await db.select({ total: sql<number>`coalesce(sum(amount), 0)` }).from(payments).where(paymentFilter);
     const [leadCount] = await db.select({ count: sql<number>`count(*)` }).from(leads).where(branchId ? eq(leads.branchId, branchId) : undefined);
     const [activeSubCount] = await db.select({ count: sql<number>`count(*)` }).from(subscriptions).where(eq(subscriptions.status, "active"));
 

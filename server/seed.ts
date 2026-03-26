@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { users, branches } from "@shared/schema";
 import { hashPassword } from "./auth";
+import { eq, inArray } from "drizzle-orm";
 
 async function seed() {
   console.log("Seeding database...");
@@ -8,7 +9,7 @@ async function seed() {
   const ownerEmail = "alishalhoub444@gmail.com";
   const ownerPassword = "123Ali123$";
 
-  const createdBranches = await db.insert(branches).values([
+  const createdBranchIds = await db.insert(branches).values([
     {
       name: "Start Living Right Gym - Broumana",
       location: "Broumana Main Street, Lebanon",
@@ -23,12 +24,17 @@ async function seed() {
       email: "elabyad@startlivingright.com",
       status: "active",
     },
-  ]).returning();
+  ]).$returningId();
+
+  const createdBranches = await db
+    .select()
+    .from(branches)
+    .where(inArray(branches.id, createdBranchIds.map((branch) => branch.id)));
 
   console.log("Created branches:", createdBranches.map((branch) => branch.name).join(", "));
 
   const ownerHash = await hashPassword(ownerPassword);
-  const [owner] = await db.insert(users).values({
+  const [{ id: ownerId }] = await db.insert(users).values({
     name: "System Owner",
     email: ownerEmail,
     password: ownerHash,
@@ -36,7 +42,9 @@ async function seed() {
     branchId: null,
     phone: "+1-555-0001",
     status: "active",
-  }).returning();
+  }).$returningId();
+
+  const [owner] = await db.select().from(users).where(eq(users.id, ownerId));
 
   console.log("Created owner:", owner.email);
   console.log("\nLogin credentials:");

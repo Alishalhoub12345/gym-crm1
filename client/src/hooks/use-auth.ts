@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, setToken, removeToken, getToken } from "@/lib/queryClient";
 
@@ -13,11 +14,21 @@ export interface AuthUser {
 export function useAuth() {
   const hasToken = !!getToken();
 
-  const { data: user, isLoading } = useQuery<AuthUser | null>({
+  const { data: user, isLoading, error } = useQuery<AuthUser | null>({
     queryKey: ["/api/auth/me"],
     enabled: hasToken,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!error) return;
+
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith("401:") || message.startsWith("404:")) {
+      removeToken();
+      queryClient.removeQueries({ queryKey: ["/api/auth/me"] });
+    }
+  }, [error]);
 
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {

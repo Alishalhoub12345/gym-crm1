@@ -44,7 +44,7 @@ type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const url = Array.isArray(queryKey) ? queryKey.join("") : (queryKey as string);
+    const url = Array.isArray(queryKey) ? queryKey.join("") : String(queryKey as unknown);
     const res = await fetch(url, { headers: getAuthHeaders() });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

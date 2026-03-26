@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { insertUserSchema, insertCarSchema, insertMessageSchema, insertOrderSchema } from './schema';
+import {
+  insertContactMessageSchema,
+  insertOrderSchema,
+  insertUserSchema,
+  type InsertOrder,
+} from './schema';
+
+const insertCarSchema = z.object({}).passthrough();
+const insertMessageSchema = insertContactMessageSchema;
 
 export const errorSchemas = {
   validation: z.object({
@@ -233,3 +241,5 @@ export function buildUrl(path: string, params?: Record<string, string | number>)
   }
   return url;
 }
+
+export type { InsertOrder };

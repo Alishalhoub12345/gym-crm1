@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getPasswordChecks, isStrongPassword } from "@/lib/password";
 import { useToast } from "@/hooks/use-toast";
 import { UserCheck, Plus, Search, Edit2, Trash2, Loader2, X } from "lucide-react";
 
@@ -40,9 +41,14 @@ export default function Coaches() {
     setShowModal(true);
   };
   const closeModal = () => { setShowModal(false); setEditing(null); setForm(emptyForm); };
+  const passwordChecks = getPasswordChecks(form.password || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editing && !isStrongPassword(form.password || "Coach@2024")) {
+      toast({ title: "Weak password", description: "Password must include one capital letter, one number, and one special character.", variant: "destructive" });
+      return;
+    }
     const data = { ...form, branchId: parseInt(form.branchId) || 1, salary: form.salary ? parseFloat(form.salary) : undefined };
     if (editing) updateMutation.mutate({ id: editing.id, data });
     else createMutation.mutate(data);
@@ -56,13 +62,13 @@ export default function Coaches() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Coaches</h1>
           <p className="text-gray-500 text-sm mt-1">{coaches.length} coaches registered</p>
         </div>
         <button onClick={openCreate} data-testid="button-add-coach"
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 sm:w-auto">
           <Plus className="w-4 h-4" /> Add Coach
         </button>
       </div>
@@ -123,15 +129,25 @@ export default function Coaches() {
               <h2 className="font-semibold text-gray-900">{editing ? "Edit Coach" : "Add Coach"}</h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-5 grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
               {!editing && <>
-                {[["name","Full Name","text","John Smith"],["email","Email","email","coach@gym.com"],["phone","Phone","tel",""],["password","Password","password","default: Coach@2024"]].map(([k,l,t,p]) => (
+                {[["name","Full Name","text","John Smith"],["email","Email","email","coach@gym.com"],["phone","Phone","tel",""]].map(([k,l,t,p]) => (
                   <div key={k}>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">{l}</label>
                     <input type={t} value={form[k]} placeholder={p} onChange={(e) => setForm({ ...form, [k]: e.target.value })}
                       className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
                 ))}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                  <input type="password" value={form.password} placeholder="default: Coach@2024" onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className={passwordChecks.hasUppercase || !form.password ? "text-green-600" : "text-gray-500"}>One capital letter</div>
+                    <div className={passwordChecks.hasDigit || !form.password ? "text-green-600" : "text-gray-500"}>One digit</div>
+                    <div className={passwordChecks.hasSpecial || !form.password ? "text-green-600" : "text-gray-500"}>One special character</div>
+                  </div>
+                </div>
               </>}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Branch</label>

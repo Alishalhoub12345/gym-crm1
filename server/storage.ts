@@ -78,6 +78,7 @@ export class DatabaseStorage {
         id: members.id,
         userId: members.userId,
         branchId: members.branchId,
+        primaryPackageId: members.primaryPackageId,
         membershipNumber: members.membershipNumber,
         gender: members.gender,
         birthDate: members.birthDate,
@@ -92,10 +93,14 @@ export class DatabaseStorage {
         userEmail: users.email,
         userPhone: users.phone,
         branchName: branches.name,
+        primaryPackageName: packages.name,
+        primaryPackageTier: packages.tier,
+        primaryPackageCycle: packages.billingCycle,
       })
       .from(members)
       .leftJoin(users, eq(members.userId, users.id))
-      .leftJoin(branches, eq(members.branchId, branches.id));
+      .leftJoin(branches, eq(members.branchId, branches.id))
+      .leftJoin(packages, eq(members.primaryPackageId, packages.id));
 
     if (branchId) {
       return query.where(eq(members.branchId, branchId)).orderBy(desc(members.id));
@@ -109,6 +114,7 @@ export class DatabaseStorage {
         id: members.id,
         userId: members.userId,
         branchId: members.branchId,
+        primaryPackageId: members.primaryPackageId,
         membershipNumber: members.membershipNumber,
         gender: members.gender,
         birthDate: members.birthDate,
@@ -123,10 +129,14 @@ export class DatabaseStorage {
         userEmail: users.email,
         userPhone: users.phone,
         branchName: branches.name,
+        primaryPackageName: packages.name,
+        primaryPackageTier: packages.tier,
+        primaryPackageCycle: packages.billingCycle,
       })
       .from(members)
       .leftJoin(users, eq(members.userId, users.id))
       .leftJoin(branches, eq(members.branchId, branches.id))
+      .leftJoin(packages, eq(members.primaryPackageId, packages.id))
       .where(eq(members.id, id));
     return member;
   }
@@ -256,6 +266,12 @@ export class DatabaseStorage {
         status: subscriptions.status,
         createdAt: subscriptions.createdAt,
         packageName: packages.name,
+        packageTier: packages.tier,
+        billingCycle: packages.billingCycle,
+        gymAccessHours: packages.gymAccessHours,
+        coachHours: packages.coachHours,
+        dietitianHours: packages.dietitianHours,
+        allowsAllBranches: packages.allowsAllBranches,
         packagePrice: packages.price,
         memberName: users.name,
       })

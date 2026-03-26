@@ -5,7 +5,30 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Plus, Edit2, Trash2, Loader2, X, CheckCircle } from "lucide-react";
 
-const emptyForm = { name: "", description: "", price: "", durationDays: "30", branchId: "", sessionsPerWeek: "", totalClasses: "", includesGymAccess: true, includesClasses: true, status: "active" };
+const emptyForm = {
+  name: "",
+  tier: "bronze",
+  billingCycle: "1_month",
+  description: "",
+  price: "",
+  durationDays: "30",
+  branchId: "",
+  gymAccessHours: "",
+  coachHours: "0",
+  dietitianHours: "0",
+  sessionsPerWeek: "",
+  totalClasses: "",
+  includesGymAccess: true,
+  includesClasses: true,
+  allowsAllBranches: false,
+  status: "active",
+};
+
+const cycleDays: Record<string, number> = {
+  "1_month": 30,
+  "3_months": 90,
+  "1_year": 365,
+};
 
 export default function Packages() {
   const { toast } = useToast();
@@ -35,14 +58,41 @@ export default function Packages() {
   const openCreate = () => { setEditing(null); setForm(emptyForm); setShowModal(true); };
   const openEdit = (p: any) => {
     setEditing(p);
-    setForm({ name: p.name, description: p.description || "", price: p.price, durationDays: p.durationDays, branchId: p.branchId || "", sessionsPerWeek: p.sessionsPerWeek || "", totalClasses: p.totalClasses || "", includesGymAccess: p.includesGymAccess, includesClasses: p.includesClasses, status: p.status });
+    setForm({
+      name: p.name,
+      tier: p.tier,
+      billingCycle: p.billingCycle,
+      description: p.description || "",
+      price: p.price,
+      durationDays: p.durationDays,
+      branchId: p.branchId || "",
+      gymAccessHours: p.gymAccessHours || "",
+      coachHours: p.coachHours ?? "0",
+      dietitianHours: p.dietitianHours ?? "0",
+      sessionsPerWeek: p.sessionsPerWeek || "",
+      totalClasses: p.totalClasses || "",
+      includesGymAccess: p.includesGymAccess,
+      includesClasses: p.includesClasses,
+      allowsAllBranches: p.allowsAllBranches,
+      status: p.status,
+    });
     setShowModal(true);
   };
   const closeModal = () => { setShowModal(false); setEditing(null); setForm(emptyForm); };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { ...form, price: parseFloat(form.price), durationDays: parseInt(form.durationDays), branchId: form.branchId ? parseInt(form.branchId) : null, sessionsPerWeek: form.sessionsPerWeek ? parseInt(form.sessionsPerWeek) : null, totalClasses: form.totalClasses ? parseInt(form.totalClasses) : null };
+    const data = {
+      ...form,
+      durationDays: cycleDays[form.billingCycle] || parseInt(form.durationDays),
+      price: parseFloat(form.price),
+      branchId: form.branchId ? parseInt(form.branchId) : null,
+      gymAccessHours: form.gymAccessHours ? parseInt(form.gymAccessHours) : null,
+      coachHours: form.coachHours ? parseInt(form.coachHours) : 0,
+      dietitianHours: form.dietitianHours ? parseInt(form.dietitianHours) : 0,
+      sessionsPerWeek: form.sessionsPerWeek ? parseInt(form.sessionsPerWeek) : null,
+      totalClasses: form.totalClasses ? parseInt(form.totalClasses) : null,
+    };
     if (editing) updateMutation.mutate({ id: editing.id, data });
     else createMutation.mutate(data);
   };
@@ -51,13 +101,13 @@ export default function Packages() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
-          <p className="text-gray-500 text-sm mt-1">Membership plans and subscriptions</p>
+          <p className="mt-1 text-sm text-gray-500">Bronze, Silver, Gold packages with time-based benefits</p>
         </div>
         <button onClick={openCreate} data-testid="button-add-package"
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 sm:w-auto">
           <Plus className="w-4 h-4" /> Add Package
         </button>
       </div>
@@ -65,37 +115,44 @@ export default function Packages() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {(packages as any[]).length === 0 ? (
-            <div className="col-span-3 text-center py-16 text-gray-400">No packages yet</div>
+            <div className="col-span-3 py-16 text-center text-gray-400">No packages yet</div>
           ) : (packages as any[]).map((p: any) => (
-            <div key={p.id} data-testid={`package-card-${p.id}`} className="bg-white rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Package className="w-5 h-5 text-primary" />
+            <div key={p.id} data-testid={`package-card-${p.id}`} className="rounded-xl border border-border bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+              <div className="mb-3 flex items-start justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Package className="h-5 w-5 text-primary" />
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{p.status}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{p.status}</span>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1">{p.name}</h3>
-              <div className="text-2xl font-bold text-primary mb-1">${parseFloat(p.price).toFixed(2)}</div>
-              <div className="text-sm text-gray-500 mb-3">{p.durationDays} days</div>
-              {p.description && <p className="text-xs text-gray-400 mb-3 line-clamp-2">{p.description}</p>}
-              <div className="space-y-1.5 mb-4">
+              <h3 className="mb-1 font-semibold text-gray-900">{p.name}</h3>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#8a6b00]">
+                {(p.tier || "bronze")} · {String(p.billingCycle || "1_month").replace(/_/g, " ")}
+              </div>
+              <div className="mb-1 text-2xl font-bold text-primary">${parseFloat(p.price).toFixed(2)}</div>
+              <div className="mb-3 text-sm text-gray-500">{p.durationDays} days</div>
+              {p.description && <p className="mb-3 line-clamp-2 text-xs text-gray-400">{p.description}</p>}
+              <div className="mb-4 space-y-1.5">
                 <div className={`flex items-center gap-1.5 text-xs ${p.includesGymAccess ? "text-green-600" : "text-gray-300"}`}>
-                  <CheckCircle className="w-3.5 h-3.5" /> Gym Access
+                  <CheckCircle className="h-3.5 w-3.5" /> Gym Access
                 </div>
                 <div className={`flex items-center gap-1.5 text-xs ${p.includesClasses ? "text-green-600" : "text-gray-300"}`}>
-                  <CheckCircle className="w-3.5 h-3.5" /> Classes Included
+                  <CheckCircle className="h-3.5 w-3.5" /> Classes Included
                 </div>
+                <div className="text-xs text-gray-500">{p.gymAccessHours || 0} gym hours</div>
+                <div className="text-xs text-gray-500">{p.coachHours || 0} coach hours</div>
+                <div className="text-xs text-gray-500">{p.dietitianHours || 0} dietitian hours</div>
+                <div className="text-xs text-gray-500">{p.allowsAllBranches ? "All branches access" : "Single branch access"}</div>
                 {p.totalClasses && <div className="text-xs text-gray-500">{p.totalClasses} total classes</div>}
                 {p.sessionsPerWeek && <div className="text-xs text-gray-500">{p.sessionsPerWeek} sessions/week</div>}
               </div>
-              <div className="flex gap-2 pt-3 border-t border-border">
-                <button onClick={() => openEdit(p)} data-testid={`button-edit-package-${p.id}`} className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-primary transition-colors">
-                  <Edit2 className="w-3.5 h-3.5" /> Edit
+              <div className="flex gap-2 border-t border-border pt-3">
+                <button onClick={() => openEdit(p)} data-testid={`button-edit-package-${p.id}`} className="flex items-center gap-1.5 text-xs text-gray-600 transition-colors hover:text-primary">
+                  <Edit2 className="h-3.5 w-3.5" /> Edit
                 </button>
-                <button onClick={() => deleteMutation.mutate(p.id)} data-testid={`button-delete-package-${p.id}`} className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 transition-colors ml-auto">
-                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                <button onClick={() => deleteMutation.mutate(p.id)} data-testid={`button-delete-package-${p.id}`} className="ml-auto flex items-center gap-1.5 text-xs text-red-500 transition-colors hover:text-red-700">
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
                 </button>
               </div>
             </div>
@@ -105,57 +162,75 @@ export default function Packages() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-white">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-border bg-white p-5">
               <h2 className="font-semibold text-gray-900">{editing ? "Edit Package" : "Add Package"}</h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-5 grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Package Name</label>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Monthly Premium"
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Package Name</label>
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Silver 3 Months"
+                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </div>
-              {[["price","Price ($)","number"],["durationDays","Duration (days)","number"],["sessionsPerWeek","Sessions/Week","number"],["totalClasses","Total Classes","number"]].map(([k,l,t]) => (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Tier</label>
+                <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value, allowsAllBranches: e.target.value === "gold" ? true : form.allowsAllBranches })}
+                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                  <option value="bronze">Bronze</option>
+                  <option value="silver">Silver</option>
+                  <option value="gold">Gold</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Billing Cycle</label>
+                <select value={form.billingCycle} onChange={(e) => setForm({ ...form, billingCycle: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                  <option value="1_month">1 month</option>
+                  <option value="3_months">3 months</option>
+                  <option value="1_year">1 year</option>
+                </select>
+              </div>
+              {[["price","Price ($)","number"],["gymAccessHours","Gym Access Hours","number"],["coachHours","Coach Hours","number"],["dietitianHours","Dietitian Hours","number"],["sessionsPerWeek","Sessions/Week","number"],["totalClasses","Total Classes","number"]].map(([k,l,t]) => (
                 <div key={k}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{l}</label>
-                  <input type={t} step={k === "price" ? "0.01" : "1"} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} required={k === "price" || k === "durationDays"}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">{l}</label>
+                  <input type={t} step={k === "price" ? "0.01" : "1"} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} required={k === "price"}
+                    className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
               ))}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Branch (leave empty for global)</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Branch</label>
                 <select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                   <option value="">Global (all branches)</option>
                   {(branches as any[]).map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Status</label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Description</label>
                 <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                  className="w-full resize-none rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </div>
-              <div className="col-span-2 flex items-center gap-6">
-                {[["includesGymAccess","Includes Gym Access"],["includesClasses","Includes Classes"]].map(([k,l]) => (
-                  <label key={k} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <div className="col-span-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+                {[["includesGymAccess","Includes Gym Access"],["includesClasses","Includes Classes"],["allowsAllBranches","Access All Branches"]].map(([k,l]) => (
+                  <label key={k} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" checked={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.checked })} className="rounded" />
                     {l}
                   </label>
                 ))}
               </div>
               <div className="col-span-2 flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={isPending} className="flex-1 bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2">
-                  {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                <button type="button" onClick={closeModal} className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={isPending} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
+                  {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editing ? "Update" : "Create"}
                 </button>
               </div>

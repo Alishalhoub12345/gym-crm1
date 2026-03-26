@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getPasswordChecks, isStrongPassword } from "@/lib/password";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, Search, Edit2, Trash2, Loader2, X, Eye } from "lucide-react";
 
 const emptyForm = {
   name: "", email: "", phone: "", password: "",
+  packageId: "",
   branchId: "", gender: "", birthDate: "", joinDate: new Date().toISOString().split("T")[0],
   membershipNumber: "", status: "active", emergencyContact: "", notes: "",
   height: "", weight: "", fitnessGoal: "",
@@ -21,6 +23,7 @@ export default function Members() {
 
   const { data: members = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/members"] });
   const { data: branches = [] } = useQuery<any[]>({ queryKey: ["/api/branches"] });
+  const { data: packages = [] } = useQuery<any[]>({ queryKey: ["/api/packages"] });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/members", data).then(r => r.json()),
@@ -53,9 +56,18 @@ export default function Members() {
     setShowModal(true);
   };
   const closeModal = () => { setShowModal(false); setEditing(null); setForm(emptyForm); };
+  const passwordChecks = getPasswordChecks(form.password || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editing && !isStrongPassword(form.password || "Member@2024")) {
+      toast({ title: "Weak password", description: "Password must include one capital letter, one number, and one special character.", variant: "destructive" });
+      return;
+    }
+    if (!editing && !form.packageId) {
+      toast({ title: "Package required", description: "Every member must have a main package.", variant: "destructive" });
+      return;
+    }
     const data = { ...form, branchId: parseInt(form.branchId) || 1 };
     if (editing) updateMutation.mutate({ id: editing.id, data });
     else createMutation.mutate(data);
@@ -80,13 +92,13 @@ export default function Members() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Members</h1>
           <p className="text-gray-500 text-sm mt-1">{members.length} total members</p>
         </div>
         <button onClick={openCreate} data-testid="button-add-member"
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 sm:w-auto">
           <Plus className="w-4 h-4" /> Add Member
         </button>
       </div>
@@ -119,6 +131,7 @@ export default function Members() {
                     <td className="px-4 py-3.5">
                       <div className="font-medium text-gray-900">{m.userName}</div>
                       <div className="text-xs text-gray-500">{m.userEmail}</div>
+                      {m.primaryPackageName && <div className="text-xs text-[#8a6b00]">{m.primaryPackageName}</div>}
                     </td>
                     <td className="px-4 py-3.5 text-gray-600">{m.branchName}</td>
                     <td className="px-4 py-3.5 text-gray-600">{m.joinDate || "—"}</td>
@@ -162,7 +175,33 @@ export default function Members() {
                   {f("name", "Full Name", "text", "John Doe")}
                   {f("email", "Email", "email", "john@example.com")}
                   {f("phone", "Phone", "tel", "+1-555-0100")}
-                  {f("password", "Password (default: Member@2024)", "password", "Leave blank for default")}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Password (default: Member@2024)</label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      placeholder="Leave blank for default"
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                    <div className="mt-2 space-y-1 text-xs">
+                      <div className={passwordChecks.hasUppercase || !form.password ? "text-green-600" : "text-gray-500"}>One capital letter</div>
+                      <div className={passwordChecks.hasDigit || !form.password ? "text-green-600" : "text-gray-500"}>One digit</div>
+                      <div className={passwordChecks.hasSpecial || !form.password ? "text-green-600" : "text-gray-500"}>One special character</div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Main Package</label>
+                    <select value={form.packageId} onChange={(e) => setForm({ ...form, packageId: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" required>
+                      <option value="">Select package</option>
+                      {(packages as any[]).filter((p: any) => p.status === "active").map((p: any) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} - {p.tier} - {p.billingCycle?.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </>}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Branch</label>

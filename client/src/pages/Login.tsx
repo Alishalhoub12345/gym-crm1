@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, MapPin, Phone } from "lucide-react";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -28,79 +28,121 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: "hsl(224, 71%, 4%)" }}>
-      {/* Left brand panel */}
-      <div className="hidden lg:flex flex-1 flex-col items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0" style={{
-          background: "radial-gradient(circle at 30% 50%, rgba(59,130,246,0.15) 0%, transparent 60%), radial-gradient(circle at 70% 20%, rgba(139,92,246,0.1) 0%, transparent 50%)"
-        }} />
-        <div className="relative z-10 text-center max-w-sm">
-          <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-primary/30">
-            <Activity className="w-10 h-10 text-white" />
+    <div className="min-h-screen bg-[#121212] lg:flex">
+      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-white/10 bg-[#181818] p-10 lg:flex xl:p-12">
+        <div
+          className="absolute inset-0 opacity-60"
+          style={{
+            background:
+              "linear-gradient(160deg, rgba(244,181,22,0.08) 0%, rgba(18,18,18,0) 38%), radial-gradient(circle at top left, rgba(255,255,255,0.08) 0%, transparent 48%)",
+          }}
+        />
+
+        <div className="relative z-10 max-w-2xl">
+          <img
+            src="/start-gym-logo.jpg"
+            alt="Start Gym Living Right"
+            className="h-28 w-auto rounded-2xl border border-white/10 bg-[#6b6b70] p-2 shadow-2xl shadow-black/30"
+          />
+          <div className="mt-8 max-w-xl">
+            <h1 className="text-5xl font-bold tracking-tight text-white">
+              Start Gym management, built around your real branches.
+            </h1>
+            <p className="mt-4 text-lg leading-8 text-white/70">
+              Manage members, coaches, classes, payments, and branch operations in one place with a brand that matches your club.
+            </p>
           </div>
-          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">GymCRM</h1>
-          <p className="text-white/50 text-lg leading-relaxed">
-            Complete gym management system for owners, admins, coaches and members.
-          </p>
-          <div className="mt-10 grid grid-cols-2 gap-4">
-            {[
-              ["Multi-Branch", "Manage all locations from one place"],
-              ["Class Booking", "Schedule and track all sessions"],
-              ["Payments", "Full payment and subscription tracking"],
-              ["CRM Leads", "Convert prospects to members"],
-            ].map(([title, desc]) => (
-              <div key={title} className="bg-white/5 rounded-xl p-4 border border-white/8 text-left">
-                <div className="text-white text-sm font-semibold mb-1">{title}</div>
-                <div className="text-white/40 text-xs leading-relaxed">{desc}</div>
+        </div>
+
+        <div className="relative z-10 grid grid-cols-3 gap-4">
+          {[
+            {
+              src: "/start-gym-floor.jpeg",
+              title: "Broumana Branch",
+              location: "Broumana Main Street, Lebanon",
+              phone: "76 446 496",
+              desc: "Main sports club branch with spacious strength and cardio training areas.",
+            },
+            {
+              src: "/start-gym-training.jpg",
+              title: "Faqra Branch",
+              location: "Faqra, Kfardebian, Oakridge",
+              phone: "76 496 999",
+              desc: "Premium coaching-focused branch designed for guided sessions and private training.",
+            },
+            {
+              src: "/start-gym-logo.jpg",
+              title: "El Abyad Branch",
+              location: "El Abyad Center, Sea Side Rd",
+              phone: "76 496 999",
+              desc: "City-access branch with quick entry, strong visibility, and convenient member access.",
+            },
+          ].map(({ src, title, location, phone, desc }) => (
+            <div key={title} className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-xl shadow-black/25">
+              <img src={src} alt={title} className="h-52 w-full object-cover" />
+              <div className="space-y-3 p-5">
+                <div className="text-lg font-semibold text-white">{title}</div>
+                <div className="flex items-start gap-2 text-xs leading-5 text-white/65">
+                  <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#f4b516]" />
+                  <span>{location}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-white/65">
+                  <Phone className="h-4 w-4 flex-shrink-0 text-[#f4b516]" />
+                  <span>{phone}</span>
+                </div>
+                <div className="text-sm leading-6 text-white/65">{desc}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Right login form */}
-      <div className="flex flex-1 lg:max-w-md xl:max-w-lg items-center justify-center p-8 bg-white">
+      <div className="flex min-h-screen flex-1 items-center justify-center bg-[#f7f3ea] p-8 lg:max-w-md xl:max-w-lg">
         <div className="w-full max-w-sm">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">GymCRM</span>
-          </div>
-
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
-            <p className="text-gray-500 mt-1 text-sm">Sign in to your account to continue</p>
+            <div className="mb-6 lg:hidden">
+              <img
+                src="/start-gym-logo.jpg"
+                alt="Start Gym Living Right"
+                className="h-20 w-auto rounded-2xl border border-black/10 bg-[#6b6b70] p-1.5 shadow-lg"
+              />
+            </div>
+
+            <h2 className="text-3xl font-bold text-[#181818]">Welcome back</h2>
+            <p className="mt-2 text-sm text-[#5a5a5a]">Sign in to manage Start Gym operations.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+              <label className="mb-1.5 block text-sm font-medium text-[#303030]">Email address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 data-testid="input-email"
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                className="w-full rounded-xl border border-[#d7d1c2] bg-white px-3.5 py-3 text-sm text-[#181818] transition-colors focus:border-[#f4b516] focus:outline-none focus:ring-2 focus:ring-[#f4b516]/20"
                 placeholder="your@email.com"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+              <label className="mb-1.5 block text-sm font-medium text-[#303030]">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   data-testid="input-password"
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-10"
-                  placeholder="••••••••"
+                  className="w-full rounded-xl border border-[#d7d1c2] bg-white px-3.5 py-3 pr-10 text-sm text-[#181818] transition-colors focus:border-[#f4b516] focus:outline-none focus:ring-2 focus:ring-[#f4b516]/20"
+                  placeholder="Enter your password"
                   required
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6b6b70] hover:text-[#181818]"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
@@ -108,20 +150,12 @@ export default function Login() {
               type="submit"
               data-testid="button-login"
               disabled={loginMutation.isPending}
-              className="w-full bg-primary text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#f4b516] px-4 py-3 text-sm font-semibold text-[#181818] transition-colors hover:bg-[#ddb012] disabled:opacity-50"
             >
-              {loginMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {loginMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Sign in
             </button>
           </form>
-
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
-            <p className="text-xs font-medium text-gray-500 mb-2">Demo credentials</p>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div><span className="text-gray-400 w-20 inline-block">Email:</span> owner@gymcrm.com</div>
-              <div><span className="text-gray-400 w-20 inline-block">Password:</span> Owner@2024!</div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

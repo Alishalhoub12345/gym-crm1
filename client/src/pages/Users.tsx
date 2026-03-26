@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getPasswordChecks, isStrongPassword } from "@/lib/password";
 import { useToast } from "@/hooks/use-toast";
 import { Users as UsersIcon, Plus, Edit2, Trash2, Loader2, X } from "lucide-react";
 
@@ -46,9 +47,15 @@ export default function Users() {
     setShowModal(true);
   };
   const closeModal = () => { setShowModal(false); setEditing(null); setForm(emptyForm); };
+  const passwordChecks = getPasswordChecks(form.password || "");
+  const shouldValidatePassword = !editing || !!form.password;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (shouldValidatePassword && !isStrongPassword(form.password || "")) {
+      toast({ title: "Weak password", description: "Password must include one capital letter, one number, and one special character.", variant: "destructive" });
+      return;
+    }
     const data = { ...form, branchId: form.branchId ? parseInt(form.branchId) : null };
     if (!data.password) delete data.password;
     if (editing) updateMutation.mutate({ id: editing.id, data });
@@ -59,13 +66,13 @@ export default function Users() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-gray-500 text-sm mt-1">{users.length} users in system</p>
         </div>
         <button onClick={openCreate} data-testid="button-add-user"
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 sm:w-auto">
           <Plus className="w-4 h-4" /> Add User
         </button>
       </div>
@@ -113,7 +120,7 @@ export default function Users() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between p-5 border-b border-border">
               <h2 className="font-semibold text-gray-900">{editing ? "Edit User" : "Add User"}</h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -124,9 +131,16 @@ export default function Users() {
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">{l}</label>
                   <input type={t} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} required={k !== "phone" && k !== "password" && !editing}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                  {k === "password" && shouldValidatePassword && (
+                    <div className="mt-2 space-y-1 text-xs">
+                      <div className={passwordChecks.hasUppercase ? "text-green-600" : "text-gray-500"}>One capital letter</div>
+                      <div className={passwordChecks.hasDigit ? "text-green-600" : "text-gray-500"}>One digit</div>
+                      <div className={passwordChecks.hasSpecial ? "text-green-600" : "text-gray-500"}>One special character</div>
+                    </div>
+                  )}
                 </div>
               ))}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
                   <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}

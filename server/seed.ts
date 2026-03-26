@@ -1,25 +1,36 @@
 import { db } from "./db";
 import { users, branches } from "@shared/schema";
 import { hashPassword } from "./auth";
-import { sql } from "drizzle-orm";
 
 async function seed() {
   console.log("Seeding database...");
 
-  const [branch] = await db.insert(branches).values({
-    name: "Main Branch",
-    location: "123 Fitness Ave, City",
-    phone: "+1-555-0100",
-    email: "main@gymcrm.com",
-    status: "active",
-  }).returning();
+  const ownerEmail = "alishalhoub444@gmail.com";
+  const ownerPassword = "123Ali123$";
 
-  console.log("Created branch:", branch.name);
+  const createdBranches = await db.insert(branches).values([
+    {
+      name: "Start Living Right Gym - Broumana",
+      location: "Broumana Main Street, Lebanon",
+      phone: "76 446 496",
+      email: "broumana@startlivingright.com",
+      status: "active",
+    },
+    {
+      name: "Start Living Right Gym - El Abyad",
+      location: "El Abyad Center, Sea Side Rd, Lebanon",
+      phone: "76 496 999",
+      email: "elabyad@startlivingright.com",
+      status: "active",
+    },
+  ]).returning();
 
-  const ownerHash = await hashPassword("Owner@2024!");
+  console.log("Created branches:", createdBranches.map((branch) => branch.name).join(", "));
+
+  const ownerHash = await hashPassword(ownerPassword);
   const [owner] = await db.insert(users).values({
     name: "System Owner",
-    email: "owner@gymcrm.com",
+    email: ownerEmail,
     password: ownerHash,
     role: "owner",
     branchId: null,
@@ -29,8 +40,8 @@ async function seed() {
 
   console.log("Created owner:", owner.email);
   console.log("\nLogin credentials:");
-  console.log("  Email:    owner@gymcrm.com");
-  console.log("  Password: Owner@2024!");
+  console.log(`  Email:    ${ownerEmail}`);
+  console.log(`  Password: ${ownerPassword}`);
   console.log("\nSeeding complete!");
   process.exit(0);
 }

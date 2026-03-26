@@ -34,13 +34,13 @@ export default function Payments() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
           <p className="text-gray-500 text-sm mt-1">Total collected: <span className="font-semibold text-gray-900">${total.toLocaleString()}</span></p>
         </div>
         <button onClick={() => setShowModal(true)} data-testid="button-add-payment"
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 sm:w-auto">
           <Plus className="w-4 h-4" /> Record Payment
         </button>
       </div>
@@ -105,7 +105,7 @@ export default function Payments() {
                   {(branches as any[]).map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount ($)</label>
                   <input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required

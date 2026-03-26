@@ -7,21 +7,21 @@
 :root {
   --background: 0 0% 98%;
   --foreground: 222 47% 11%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
+  --primary: 45 91% 52%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 42 46% 92%;
   --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 210 40% 96%;
+  --muted: 42 46% 92%;
+  --muted-foreground: 36 12% 39%;
+  --accent: 42 46% 92%;
   --accent-foreground: 222 47% 11%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
+  --border: 36 28% 82%;
+  --input: 36 28% 82%;
+  --ring: 45 91% 52%;
   --radius: 0.5rem;
-  --sidebar-bg: 224 71% 4%;
+  --sidebar-bg: 0 0% 9%;
   --sidebar-fg: 213 31% 91%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
@@ -67,10 +67,10 @@
     @apply bg-white/10 text-white;
   }
   .sidebar-item.active {
-    @apply bg-primary text-white shadow-md;
+    @apply bg-[#f4b516] text-[#181818] shadow-md;
   }
   .stat-card {
-    @apply bg-white rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow;
+    @apply bg-white/90 rounded-2xl border border-[#ddd5bf] p-5 shadow-sm hover:shadow-md transition-shadow;
   }
 }
 

@@ -1,8 +1,14 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { authenticate, requireRole, generateToken, hashPassword, verifyPassword } from "./auth";
+import { authenticate, requireRole, generateToken, hashPassword, verifyPassword, hasStrongPasswordRules, getPasswordRuleMessage } from "./auth";
 import { z } from "zod";
+
+function addDays(dateString: string, days: number) {
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split("T")[0];
+}
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
 
@@ -76,7 +82,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { password, ...rest } = req.body;
       const existing = await storage.getUserByEmail(rest.email);
       if (existing) return res.status(400).json({ message: "Email already in use" });
-      const hashed = await hashPassword(password || "GymCRM@2024");
+      const rawPassword = password || "GymCRM@2024";
+      if (!hasStrongPasswordRules(rawPassword)) return res.status(400).json({ message: getPasswordRuleMessage() });
+      const hashed = await hashPassword(rawPassword);
       const user = await storage.createUser({ ...rest, password: hashed });
       res.status(201).json({ id: user.id, name: user.name, email: user.email, role: user.role, branchId: user.branchId });
     } catch (err) {
@@ -88,6 +96,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const data = { ...req.body };
       if (data.password) {
+        if (!hasStrongPasswordRules(data.password)) return res.status(400).json({ message: getPasswordRuleMessage() });
         data.password = await hashPassword(data.password);
       }
       const user = await storage.updateUser(parseInt(req.params.id), data);
@@ -117,12 +126,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/members", authenticate, requireRole("owner", "admin"), async (req: any, res) => {
     try {
-      const { email, name, phone, password, ...memberData } = req.body;
+      const { email, name, phone, password, packageId, ...memberData } = req.body;
       const existing = await storage.getUserByEmail(email);
       if (existing) return res.status(400).json({ message: "Email already in use" });
-      const hashed = await hashPassword(password || "Member@2024");
+      if (!packageId) return res.status(400).json({ message: "A main package is required for every member" });
+      const pkg = await storage.getPackage(parseInt(packageId));
+      if (!pkg || pkg.status !== "active") return res.status(400).json({ message: "Selected package is not available" });
+      if (!pkg.allowsAllBranches && pkg.branchId && pkg.branchId !== memberData.branchId) {
+        return res.status(400).json({ message: "Selected package does not belong to the chosen branch" });
+      }
+      const rawPassword = password || "Member@2024";
+      if (!hasStrongPasswordRules(rawPassword)) return res.status(400).json({ message: getPasswordRuleMessage() });
+      const hashed = await hashPassword(rawPassword);
       const user = await storage.createUser({ name, email, phone, password: hashed, role: "member", branchId: memberData.branchId, status: "active" });
-      const member = await storage.createMember({ ...memberData, userId: user.id });
+      const member = await storage.createMember({ ...memberData, userId: user.id, primaryPackageId: pkg.id });
+      const startDate = memberData.joinDate || new Date().toISOString().split("T")[0];
+      await storage.createSubscription({
+        memberId: member.id,
+        packageId: pkg.id,
+        startDate,
+        endDate: addDays(startDate, Math.max(pkg.durationDays - 1, 0)),
+        remainingClasses: pkg.totalClasses,
+        status: "active",
+      });
       res.status(201).json({ ...member, userName: name, userEmail: email });
     } catch (err) {
       res.status(400).json({ message: "Failed to create member" });
@@ -162,7 +188,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { email, name, phone, password, ...coachData } = req.body;
       const existing = await storage.getUserByEmail(email);
       if (existing) return res.status(400).json({ message: "Email already in use" });
-      const hashed = await hashPassword(password || "Coach@2024");
+      const rawPassword = password || "Coach@2024";
+      if (!hasStrongPasswordRules(rawPassword)) return res.status(400).json({ message: getPasswordRuleMessage() });
+      const hashed = await hashPassword(rawPassword);
       const user = await storage.createUser({ name, email, phone, password: hashed, role: "coach", branchId: coachData.branchId, status: "active" });
       const coach = await storage.createCoach({ ...coachData, userId: user.id });
       res.status(201).json({ ...coach, userName: name, userEmail: email });

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Users, Building2, Dumbbell, UserCheck,
   Package, CreditCard, ClipboardCheck, TrendingUp, ShoppingBag,
-  Salad, MessageSquare, LogOut, ChevronRight, Activity
+  Salad, MessageSquare, LogOut, ChevronRight, X
 } from "lucide-react";
 
 interface NavItem {
@@ -29,7 +29,12 @@ const navItems: NavItem[] = [
   { label: "Users", path: "/users", icon: Users, roles: ["owner", "admin"] },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
@@ -38,15 +43,34 @@ export default function Sidebar() {
   const filtered = navItems.filter(item => item.roles.includes(user.role));
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col z-30" style={{ background: "hsl(224, 71%, 4%)" }}>
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          className="fixed inset-0 z-30 bg-black/55 md:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside className={`fixed left-0 top-0 z-40 flex h-screen w-72 max-w-[85vw] flex-col border-r border-white/10 bg-[#181818] transition-transform duration-200 md:w-64 md:max-w-none ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      }`}>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
-        <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shadow-lg">
-          <Activity className="w-5 h-5 text-white" />
+      <div className="border-b border-white/10 px-5 py-5">
+        <div className="mb-3 flex items-start justify-between md:mb-0">
+          <div className="md:hidden text-xs uppercase tracking-[0.18em] text-white/40">Navigation</div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-white/65 hover:bg-white/10 hover:text-white md:hidden">
+            <X className="h-4 w-4" />
+          </button>
         </div>
+        <img
+          src="/start-gym-logo.jpg"
+          alt="Start Gym Living Right"
+          className="h-16 w-auto rounded-2xl border border-white/10 bg-[#6b6b70] p-1.5 shadow-xl shadow-black/25"
+        />
         <div>
-          <div className="text-white font-bold text-base leading-tight">GymCRM</div>
-          <div className="text-white/40 text-xs capitalize">{user.role}</div>
+          <div className="mt-3 text-base font-bold leading-tight text-white">Start Living Right Gym</div>
+          <div className="text-xs capitalize text-[#f4b516]">{user.role}</div>
         </div>
       </div>
 
@@ -58,8 +82,9 @@ export default function Sidebar() {
           return (
             <Link key={item.path} href={item.path}>
               <div
+                onClick={onClose}
                 data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
-                className={`sidebar-item ${isActive ? "active" : "text-white/60"}`}
+                className={`sidebar-item ${isActive ? "active" : "text-white/65"}`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{item.label}</span>
@@ -71,20 +96,24 @@ export default function Sidebar() {
       </nav>
 
       {/* User profile & logout */}
-      <div className="px-3 pb-4 pt-2 border-t border-white/10">
+      <div className="border-t border-white/10 px-3 pb-4 pt-2">
         <div className="px-3 py-2 mb-1">
           <div className="text-white text-sm font-medium truncate">{user.name}</div>
-          <div className="text-white/40 text-xs truncate">{user.email}</div>
+          <div className="text-white/45 text-xs truncate">{user.email}</div>
         </div>
         <button
-          onClick={logout}
+          onClick={() => {
+            onClose?.();
+            logout();
+          }}
           data-testid="button-logout"
-          className="sidebar-item text-white/60 w-full hover:text-red-400 hover:bg-red-500/10"
+          className="sidebar-item w-full text-white/65 hover:bg-red-500/10 hover:text-red-300"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
